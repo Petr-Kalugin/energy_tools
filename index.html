@@ -65,7 +65,7 @@ p{margin-bottom:12px}.small{font-size:14px;color:var(--soft)}
 // ---- настройки (заполнить перед публикацией) ----
 var CONTACT = "kaluginpn";   // без @
 var VC_URL = "";                          // ссылка на статью на VC (пока пусто = ссылка скрыта)
-var ANALYTICS_URL = "";                   // адрес приёма событий, пока пусто = аналитика выключена
+var ANALYTICS_URL = "https://script.google.com/macros/s/AKfycbyDEP_dQVnfZJF5K_5XjsC03VgrHOHS0Q4wNKYoSJ4lKnRNmTgU0HE6BJ3u4ypVvnJ7PA/exec";                   // адрес приёма событий, пока пусто = аналитика выключена
 
 var tg = window.Telegram && Telegram.WebApp;
 if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
@@ -86,7 +86,11 @@ var store = {
 var SID = Math.random().toString(36).slice(2);
 function track(e, d) {
   if (!ANALYTICS_URL) return;
-  try { navigator.sendBeacon(ANALYTICS_URL, JSON.stringify({ s: SID, e: e, d: d || null, t: Date.now() })); } catch (x) {}
+  var body = JSON.stringify({ s: SID, e: e, d: d || null, t: Date.now() });
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon(ANALYTICS_URL, body)) return;
+    fetch(ANALYTICS_URL, { method: "POST", mode: "no-cors", keepalive: true, headers: { "Content-Type": "text/plain" }, body: body });
+  } catch (x) {}
 }
 
 var Q = [
@@ -331,6 +335,7 @@ function foot(noFb) {
 }
 
 // ---- запуск: если результат уже есть, показываем его ----
+track("open");
 store.get("ch", function (c) {
   try { S.ch = c ? JSON.parse(c) : []; } catch (e) { S.ch = []; }
   store.get("bat", function (v) {
