@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Батарейка — тест заряда</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{--g1:#14509e;--g2:#4fb0f0;--fill:#cfe9ff;--ink:#0d2a4d;--soft:#5b7391}
+body[data-zone=green]{--g1:#14509e;--g2:#2fc79a;--fill:#b9f5dd}
+body[data-zone=yellow]{--g1:#25579f;--g2:#f0c24a;--fill:#fff0b8}
+body[data-zone=red]{--g1:#3a56b0;--g2:#e5686a;--fill:#ffd1d1}
+*{box-sizing:border-box;margin:0}
+html,body{min-height:100%}
+body{font:17px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);
+ background:linear-gradient(165deg,var(--g1),var(--g2)) fixed;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#bat{display:none;position:sticky;top:0;padding:14px 18px 10px;color:#fff;z-index:5;
+ background:linear-gradient(var(--g1),transparent)}
+#bat.on{display:block}
+#bat .row{display:flex;justify-content:space-between;font-size:14px;margin-bottom:6px;opacity:.95}
+#cells{display:flex;gap:3px;padding:3px;border:2px solid #fff;border-radius:8px;position:relative}
+#cells:after{content:"";position:absolute;right:-7px;top:30%;height:40%;width:4px;background:#fff;border-radius:0 3px 3px 0}
+#cells i{flex:1;height:18px;border-radius:3px;background:rgba(255,255,255,.2);transition:background .4s}
+#cells i.f{background:var(--fill)}
+#cells i.m{margin-left:3px;box-shadow:-3px 0 0 -1px rgba(255,255,255,.7)}
+main{max-width:520px;margin:0 auto;padding:18px}
+.card{background:#fff;border-radius:22px;padding:22px 20px;box-shadow:0 10px 30px rgba(8,30,70,.25)}
+h1{font-size:30px;line-height:1.15;letter-spacing:-.02em;margin-bottom:12px}
+h2{font-size:23px;line-height:1.2;margin-bottom:10px}
+p{margin-bottom:12px}.small{font-size:14px;color:var(--soft)}
+.btn{display:block;width:100%;padding:15px;border:0;border-radius:14px;font:inherit;font-weight:600;
+ background:var(--ink);color:#fff;margin-top:10px;cursor:pointer}
+.btn.alt{background:#e8f1fb;color:var(--ink)}
+.btn:focus-visible,.opt:focus-visible,.mk:focus-visible{outline:3px solid #ffb703;outline-offset:2px}
+.scale{display:flex;gap:8px;margin:18px 0 6px}
+.opt{flex:1;padding:16px 0;border:2px solid #cfdcec;border-radius:14px;background:#fff;font:inherit;font-weight:700;color:var(--ink);cursor:pointer}
+.opt:active{background:#e8f1fb}
+.ends{display:flex;justify-content:space-between;font-size:13px;color:var(--soft)}
+.prog{height:6px;background:#dbe6f3;border-radius:3px;margin-bottom:18px;overflow:hidden}
+.prog b{display:block;height:100%;background:var(--ink);transition:width .3s}
+.task{border-top:1px solid #e1eaf4;padding:14px 0}
+.task b{display:block;margin-bottom:2px}
+.marks{display:flex;gap:6px;margin-top:8px}
+.mk{flex:1;padding:9px 0;border:2px solid #cfdcec;border-radius:10px;background:#fff;font:inherit;font-size:15px;cursor:pointer;color:var(--ink)}
+.mk.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.note{color:#fff;font-size:13px;opacity:.92;margin-top:14px;text-align:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.chip{padding:7px 11px;border:1px solid #cfdcec;border-radius:999px;background:#f3f8fd;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
+#tx{width:100%;padding:13px;border:2px solid #cfdcec;border-radius:12px;font:inherit;color:var(--ink);margin-top:6px}
+.rg{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:13px;color:var(--soft)}.rg input{flex:1}
+.ev{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid #e1eaf4}
+.ev b.p{color:#0f8a5f}.ev b.m{color:#c0393b}
+.au{display:flex;align-items:center;justify-content:center;gap:12px;color:#fff;margin:14px 0 10px;font-size:15px}
+#av,.av{width:44px;height:44px;border-radius:50%;object-fit:cover;background:#fff;color:var(--ink);display:grid;place-items:center;font-weight:700;font-size:15px}
+.tg{width:40px;height:40px;border-radius:50%;background:#fff;color:#229ED9;display:grid;place-items:center}
+.tg svg{width:22px;height:22px}
+.task input{width:100%;padding:11px;border:2px solid #cfdcec;border-radius:10px;font:inherit;color:var(--ink);margin-top:8px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="bat"><div class="row"><span>Энергия</span><span id="lv"></span></div><div id="cells"></div></div>
+<main id="app"></main>
+<script>
+// ---- настройки (заполнить перед публикацией) ----
+var CONTACT = "kaluginpn";   // без @
+var VC_URL = "";                          // ссылка на статью на VC (пока пусто = ссылка скрыта)
+var ANALYTICS_URL = "";                   // адрес приёма событий, пока пусто = аналитика выключена
+
+var tg = window.Telegram && Telegram.WebApp;
+if (tg) { try { tg.ready(); tg.expand(); } catch (e) {} }
+
+// ---- хранилище: облако Telegram, иначе браузер ----
+var store = {
+  get: function (k, cb) {
+    try { if (tg && tg.CloudStorage && tg.isVersionAtLeast("6.9")) { tg.CloudStorage.getItem(k, function (e, v) { cb(e ? null : v); }); return; } } catch (e) {}
+    try { cb(localStorage.getItem(k)); } catch (e) { cb(null); }
+  },
+  set: function (k, v) {
+    try { if (tg && tg.CloudStorage && tg.isVersionAtLeast("6.9")) { tg.CloudStorage.setItem(k, v); return; } } catch (e) {}
+    try { localStorage.setItem(k, v); } catch (e) {}
+  }
+};
+
+// ---- обезличенная аналитика: случайный id сессии, без данных пользователя ----
+var SID = Math.random().toString(36).slice(2);
+function track(e, d) {
+  if (!ANALYTICS_URL) return;
+  try { navigator.sendBeacon(ANALYTICS_URL, JSON.stringify({ s: SID, e: e, d: d || null, t: Date.now() })); } catch (x) {}
+}
+
+var Q = [
+  "Я просыпаюсь с ощущением, что силы есть.",
+  "Я легко берусь за задачи и не откладываю их без причины.",
+  "После выходных или отпуска я действительно чувствую себя отдохнувшим.",
+  "Меня по-прежнему радует то, что раньше заряжало: музыка, прогулки, общение, хобби.",
+  "К вечеру у меня остаются силы на то, что мне приятно.",
+  "Неопределённость и неожиданные задачи вызывают у меня раздражение или ступор.",
+  "Я могу удерживать внимание на одной задаче без постоянных отвлечений."
+];
+var REV = { 5: true }; // вопросы с обратной шкалой
+var ZONES = {
+  green: ["Зелёная зона", "Ты на управляемой территории. Можно спокойно строить систему: дневник событий, личный набор быстрой зарядки, планирование с запасом."],
+  yellow: ["Жёлтая зона", "Организм уже экономит силы. Одному выбраться непросто: помогает напарник или наставник, который регулярно даёт обратную связь."],
+  red: ["Красная зона", "Сначала аптечка. Недельный дневник пока не нужен: начнём с четырёх маленьких действий, которые возвращают силы."]
+};
+var KIT = [
+  ["Музыка", "Включи один трек, который раньше поднимал настроение, и дослушай до конца. Впиши его название."],
+  ["Воздух", "Выйди на 10 минут пройтись без цели, по возможности без телефона."],
+  ["Тело", "Встань, подними руки вверх и потянись на три глубоких вдоха. Затем сделай 10 медленных кругов плечами назад и наклони голову к каждому плечу на 15 секунд."],
+  ["Общение", "Короткий контакт с человеком, рядом с которым спокойно: сообщение, звонок или чай."]
+];
+var MK = ["Легче", "Так же", "Хуже"];
+
+var S = { i: 0, sum: 0, zone: null, charge: null, base: null, ev: [], kit: {}, ch: [], track: "" };
+var app = document.getElementById("app");
+
+function today() { var d = new Date(); return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate(); }
+function zoneOf(c) { return c >= 8 ? "green" : c >= 4 ? "yellow" : "red"; }
+function recalc() {
+  var t = 0; S.ev.forEach(function (e) { t += e.v; });
+  S.charge = Math.max(0, Math.min(20, S.base + t)); S.zone = zoneOf(S.charge);
+}
+function esc(x) { return String(x).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+function save() {
+  store.set("bat", JSON.stringify({ base: S.base, day: today(), ev: S.ev.slice(-20), kit: S.kit, tn: S.track }));
+  store.set("ch", JSON.stringify(S.ch));
+}
+function addKitEvent(t, v) {
+  if (!S.ev.some(function (e) { return e.k && e.t === t; })) S.ev.push({ t: t, v: v, k: 1 });
+}
+function addCharge(t, v) {
+  var k = t.toLowerCase(), f = S.ch.filter(function (c) { return c.t.toLowerCase() === k; })[0];
+  if (f) f.v = Math.max(f.v, v); else S.ch.push({ t: t, v: v });
+  S.ch.sort(function (a, b) { return b.v - a.v; }); S.ch = S.ch.slice(0, 15);
+}
+function chargesHtml() {
+  if (!S.ch.length) return '<p class="small">Здесь появятся твои зарядки: то, что помогло в аптечке или добавило энергии в дневнике.</p>';
+  var li = "";
+  S.ch.slice(0, 10).forEach(function (c) { li += '<div class="ev"><span>' + esc(c.t) + '</span><b class="p">' + fmt(c.v) + "</b></div>"; });
+  return li;
+}
+function h(html) {
+  app.innerHTML = html; window.scrollTo(0, 0);
+  var av = document.getElementById("av");
+  if (av) av.onerror = function () { var sp = document.createElement("span"); sp.className = "av"; sp.textContent = "КП"; av.replaceWith(sp); };
+  var fb = document.getElementById("fb");
+  if (fb) fb.onclick = function () { track("feedback_open"); feedback(); };
+  var tl = document.getElementById("tgl");
+  if (tl) tl.onclick = function (e) { track("author_click"); if (tg && tg.openTelegramLink) { e.preventDefault(); tg.openTelegramLink(tl.href); } };
+}
+
+function battery() {
+  var bat = document.getElementById("bat"), cells = document.getElementById("cells");
+  if (S.charge === null) { bat.className = ""; return; }
+  bat.className = "on";
+  document.body.setAttribute("data-zone", S.zone);
+  var s = "";
+  for (var n = 1; n <= 20; n++) s += '<i class="' + (n <= S.charge ? "f" : "") + (n === 5 || n === 9 ? " m" : "") + '"></i>';
+  cells.innerHTML = s;
+  document.getElementById("lv").textContent = S.charge + " из 20";
+}
+
+function start() {
+  S.i = 0; S.sum = 0;
+  h('<div class="card"><h1>Сколько заряда у твоей батарейки?</h1>' +
+    '<p>Семь коротких вопросов, около двух минут. По результату инструмент подстроится под твой уровень.</p>' +
+    '<p class="small">Мы ничего не храним и не собираем персональные данные. Твои ответы остаются в твоём Telegram (синхронизируются между твоими устройствами) или в браузере на этом устройстве, если ты открыл(а) ссылку не в Telegram. Лучше выбрать одно устройство, которое всегда под рукой.</p>' +
+    '<button class="btn" id="go">Начать</button></div>' + foot());
+  document.getElementById("go").onclick = function () { track("start"); intro(); };
+}
+
+function intro() {
+  h('<div class="card"><h2>Как это работает</h2>' +
+    '<p>Представь себя как батарейку. Она и разряжается, и заряжается: что-то в течение дня отнимает у тебя силы, а что-то возвращает.</p>' +
+    '<p>Это приложение поможет определить твой текущий уровень энергии и собрать личный набор зарядок, чтобы поддерживать себя в тонусе.</p>' +
+    (VC_URL ? '<p class="small"><a href="' + VC_URL + '" target="_blank" rel="noopener">Подробнее об инструменте читай в статье на VC</a></p>' : "") +
+    '<button class="btn" id="go2">К тесту</button></div>' + foot());
+  document.getElementById("go2").onclick = quiz;
+}
+
+function quiz() {
+  var b = "";
+  for (var n = 1; n <= 5; n++) b += '<button class="opt" data-v="' + n + '">' + n + "</button>";
+  h('<div class="card"><div class="prog"><b style="width:' + (S.i / Q.length * 100) + '%"></b></div>' +
+    '<p class="small">Вопрос ' + (S.i + 1) + " из " + Q.length + ", последние две недели</p><h2>" + Q[S.i] + "</h2>" +
+    '<div class="scale">' + b + '</div><div class="ends"><span>почти никогда</span><span>почти всегда</span></div></div>' + foot());
+  Array.prototype.forEach.call(document.querySelectorAll(".opt"), function (el) {
+    el.onclick = function () {
+      var v = +el.getAttribute("data-v"); S.sum += REV[S.i] ? 6 - v : v; S.i++;
+      track("answer", S.i);
+      if (S.i < Q.length) quiz(); else finish();
+    };
+  });
+}
+
+function finish() {
+  S.base = Math.max(0, Math.min(20, Math.floor((S.sum - 7) * 20 / 28)));
+  S.ev = []; recalc();
+  track("zone", S.zone); save(); battery(); result();
+}
+
+function result() {
+  battery();
+  var z = ZONES[S.zone], red = zoneOf(S.base) === "red";
+  h('<div class="card"><h1>' + z[0] + "</h1><p>Уровень энергии сейчас: <b>" + S.charge + " из 20</b>.</p><p>" + z[1] + "</p>" +
+    '<h2 style="margin-top:18px">Мои зарядки</h2>' + chargesHtml() +
+    (red ? '<button class="btn" id="kit">Собрать аптечку</button>' : "") +
+    '<button class="btn' + (red ? " alt" : "") + '" id="dy">Открыть дневник уровня энергии</button>' +
+    '<button class="btn alt" id="rt">Пройти тест заново</button></div>' + foot());
+  var k = document.getElementById("kit"); if (k) k.onclick = function () { track("kit_open"); kit(); };
+  document.getElementById("dy").onclick = function () { track("diary_open"); diary(); };
+  document.getElementById("rt").onclick = function () {
+    track("retake");
+    S.i = 0; S.sum = 0; S.charge = null; S.zone = null; S.base = null; S.ev = []; S.kit = {}; S.track = "";
+    document.body.removeAttribute("data-zone"); store.set("bat", "{}"); battery(); quiz();
+  };
+}
+
+var CH = [["Любимая музыка", 3], ["Пять минут на природе", 4], ["Горячий душ", 5], ["Звонок приятному человеку", 3], ["Рутинный отчёт", -3], ["Конфликтный разговор", -6]];
+function fmt(v) { return (v > 0 ? "+" : "−") + Math.abs(v); }
+
+function diary() {
+  var ch = "", li = "", plus = 0, minus = 0;
+  CH.forEach(function (c, n) { ch += '<button class="chip" data-n="' + n + '">' + c[0] + " " + fmt(c[1]) + "</button>"; });
+  S.ev.slice().reverse().forEach(function (e) {
+    li += '<div class="ev"><span>' + esc(e.t) + '</span><b class="' + (e.v > 0 ? "p" : "m") + '">' + fmt(e.v) + "</b></div>";
+  });
+  S.ev.forEach(function (e) { if (e.v > 0) plus += e.v; else minus -= e.v; });
+  h('<div class="card"><h2>Дневник уровня энергии</h2><p class="small">Записывай всё, что добавляет или забирает силы, даже мелочи. Сила события от 1 до 10, баллы у каждого свои.</p>' +
+    '<div class="chips">' + ch + "</div>" +
+    '<input id="tx" maxlength="40" placeholder="Что произошло?" autocomplete="off">' +
+    '<div class="rg"><span>−10</span><input id="st" type="range" min="-10" max="10" step="1" value="3"><span>+10</span></div>' +
+    '<p class="small" id="sv" style="text-align:center">+3</p>' +
+    '<button class="btn" id="ad">Добавить</button>' +
+    '<p style="margin-top:18px"><b>Сегодня: ' + fmt(plus) + " / " + fmt(-minus) + "</b>, уровень " + S.charge + " из 20</p>" + li +
+    '<button class="btn alt" id="bk">Назад к результату</button></div>' + foot());
+  var tx = document.getElementById("tx"), st = document.getElementById("st"), sv = document.getElementById("sv");
+  st.oninput = function () { sv.textContent = +st.value === 0 ? "0" : fmt(+st.value); };
+  Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (el) {
+    el.onclick = function () { var c = CH[+el.getAttribute("data-n")]; tx.value = c[0]; st.value = c[1]; st.oninput(); };
+  });
+  document.getElementById("ad").onclick = function () {
+    var v = +st.value; if (!v) { sv.textContent = "Выбери силу события, не ноль"; return; }
+    S.ev.push({ t: tx.value.trim() || "Событие", v: v }); S.ev = S.ev.slice(-30);
+    if (v > 0) addCharge(S.ev[S.ev.length - 1].t, v);
+    recalc(); save(); track("event_add", v > 0 ? "+" : "-"); battery(); diary();
+  };
+  document.getElementById("bk").onclick = result;
+}
+
+function kit() {
+  var s = "";
+  KIT.forEach(function (t, n) {
+    s += '<div class="task"><b>' + t[0] + "</b>" + t[1] +
+      (n === 0 ? '<input id="tn" maxlength="40" placeholder="Название трека" value="' + esc(S.track) + '">' : "") + '<div class="marks">';
+    MK.forEach(function (m, j) { s += '<button class="mk' + (S.kit[n] === j ? " on" : "") + '" data-n="' + n + '" data-j="' + j + '">' + m + "</button>"; });
+    s += "</div></div>";
+  });
+  var done = Object.keys(S.kit).length === KIT.length;
+  h('<div class="card"><h2>Аптечка на сегодня</h2><p>Сделай любое из заданий и отметь, что изменилось.</p>' + s +
+    (done ? '<button class="btn" id="fin">Посмотреть итог</button>' : "") +
+    '<button class="btn alt" id="bk">Назад к результату</button></div>' + foot());
+  var tn = document.getElementById("tn"); tn.oninput = function () { S.track = tn.value; save(); };
+  Array.prototype.forEach.call(document.querySelectorAll(".mk"), function (el) {
+    el.onclick = function () { S.kit[el.getAttribute("data-n")] = +el.getAttribute("data-j"); track("kit_mark", el.getAttribute("data-n") + ":" + el.getAttribute("data-j")); save(); kit(); };
+  });
+  var f = document.getElementById("fin"); if (f) f.onclick = function () { track("kit_done"); kitDone(); };
+  document.getElementById("bk").onclick = result;
+}
+
+function kitDone() {
+  var names = [S.track ? "Музыка: " + S.track : "Любимая музыка", "Десять минут на воздухе", "Упражнение «потянись»", "Короткий контакт с приятным человеком"];
+  var win = [];
+  KIT.forEach(function (t, n) { if (S.kit[n] === 0) win.push(n); });
+  win.forEach(function (n) { addCharge(names[n], 3); addKitEvent(names[n], 3); }); recalc(); save(); battery();
+  if (!win.length) {
+    h('<div class="card"><h2>Пока без перемен</h2><p>Ничего не стало легче, и это нормально, когда запас сильно снижен. Попробуй в другое время дня или повтори завтра. Если сил совсем нет, помогут напарник или наставник: загляни в «Предложения и пожелания» внизу.</p>' +
+      '<button class="btn" id="kb">Вернуться к аптечке</button><button class="btn alt" id="mn">На главный экран</button></div>' + foot());
+    document.getElementById("kb").onclick = kit;
+  } else {
+    h('<div class="card"><h2>Отлично!</h2><p>Мы нашли простые инструменты, которые помогают тебе выбраться в более ресурсное состояние. Продолжай использовать их каждый день.</p>' +
+      '<h2 style="margin-top:14px">Мои зарядки</h2>' + chargesHtml() +
+      '<p style="margin-top:16px"><b>Добавь своё событие, которое придало тебе энергии</b></p>' +
+      '<input id="tx" maxlength="40" placeholder="Что тебя зарядило?" autocomplete="off">' +
+      '<div class="rg"><span>+1</span><input id="st" type="range" min="1" max="10" step="1" value="3"><span>+10</span></div>' +
+      '<p class="small" id="sv" style="text-align:center">+3</p>' +
+      '<button class="btn" id="ad">Добавить в мои зарядки</button><button class="btn alt" id="mn">На главный экран</button></div>' + foot());
+    var tx = document.getElementById("tx"), st = document.getElementById("st"), sv = document.getElementById("sv");
+    st.oninput = function () { sv.textContent = "+" + st.value; };
+    document.getElementById("ad").onclick = function () {
+      if (!tx.value.trim()) { sv.textContent = "Напиши, что тебя зарядило"; return; }
+      addCharge(tx.value.trim(), +st.value); S.ev.push({ t: tx.value.trim(), v: +st.value }); recalc(); save(); battery(); track("own_charge"); kitDone();
+    };
+  }
+  document.getElementById("mn").onclick = result;
+}
+
+function write(kind) {
+  track("contact_click", kind);
+  var zn = S.base !== null ? ZONES[zoneOf(S.base)][0].toLowerCase() + " по тесту" : "зона не определена";
+  var txt = kind === "mentor"
+    ? "Привет, Петр! Прошёл(ла) тест батарейки, " + zn + ". Хочу найти наставника или напарника, чтобы внедрить инструмент."
+    : "Привет, Петр! Попробовал(а) приложение про батарейку. Мои предложения по улучшению: ";
+  var u = "https://t.me/" + CONTACT + "?text=" + encodeURIComponent(txt);
+  if (tg && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, "_blank");
+}
+
+function feedback() {
+  h('<div class="card"><h2>Предложения и пожелания</h2><p>Выбери, о чём хочешь написать. Сообщение откроется в Telegram с готовой заготовкой.</p>' +
+    '<button class="btn" id="fs">Предложить улучшение приложения</button><button class="btn" id="fm">Нужен наставник или напарник</button>' +
+    '<button class="btn alt" id="bk">Назад</button></div>' + foot(true));
+  document.getElementById("fs").onclick = function () { write("idea"); };
+  document.getElementById("fm").onclick = function () { write("mentor"); };
+  document.getElementById("bk").onclick = result;
+}
+
+function foot(noFb) {
+  return (S.zone && !noFb ? '<button class="btn alt" id="fb">Предложения и пожелания</button>' : "") + '<p class="note">Это практика самоуправления энергией, а не лечение. Если усталость держится, сопровождается нарушениями сна, потерей интереса почти ко всему или ощущением безнадёжности, обратись к врачу или психотерапевту.</p>' +
+    '<div class="au"><img id="av" src="avatar.jpg" alt="" width="44" height="44"><span>Автор: Калугин Петр</span>' +
+    '<a class="tg" id="tgl" href="https://t.me/kaluginpn" target="_blank" rel="noopener" aria-label="Написать автору в Telegram">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a></div>';
+}
+
+// ---- запуск: если результат уже есть, показываем его ----
+store.get("ch", function (c) {
+  try { S.ch = c ? JSON.parse(c) : []; } catch (e) { S.ch = []; }
+  store.get("bat", function (v) {
+    try {
+      var d = v && JSON.parse(v);
+      if (d && d.base != null) { S.base = d.base; S.ev = d.day === today() ? (d.ev || []) : []; S.kit = d.kit || {}; S.track = d.tn || ""; recalc(); battery(); result(); return; }
+    } catch (e) {}
+    start();
+  });
+});
+</script>
+</body>
+</html>
