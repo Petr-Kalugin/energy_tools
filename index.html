@@ -147,7 +147,7 @@ function h(html) {
   var fb = document.getElementById("fb");
   if (fb) fb.onclick = function () { track("feedback_open"); feedback(); };
   var tl = document.getElementById("tgl");
-  if (tl) tl.onclick = function (e) { track("author_click"); if (tg && tg.openTelegramLink) { e.preventDefault(); tg.openTelegramLink(tl.href); } };
+  if (tl) tl.onclick = function (e) { track("author_click"); if (tg && tg.openTelegramLink) { e.preventDefault(); openTg("/kaluginpn"); } };
 }
 
 function battery() {
@@ -296,14 +296,22 @@ function kitDone() {
   document.getElementById("mn").onclick = result;
 }
 
+// внутри Telegram открываем штатным способом, в браузере используем полный адрес telegram.me
+function openTg(path) {
+  if (tg && tg.openTelegramLink) {
+    try { tg.openTelegramLink("https://t.me" + path); return; } catch (e) {}
+  }
+  window.open("https://telegram.me" + path, "_blank");
+}
+
 function write(kind) {
   track("contact_click", kind);
   var zn = S.base !== null ? ZONES[zoneOf(S.base)][0].toLowerCase() + " по тесту" : "зона не определена";
   var txt = kind === "mentor"
     ? "Привет, Петр! Прошёл(ла) тест батарейки, " + zn + ". Хочу найти наставника или напарника, чтобы внедрить инструмент."
     : "Привет, Петр! Попробовал(а) приложение про батарейку. Мои предложения по улучшению: ";
-  var u = "https://t.me/" + CONTACT + "?text=" + encodeURIComponent(txt);
-  if (tg && tg.openTelegramLink) tg.openTelegramLink(u); else window.open(u, "_blank");
+  var q = "/" + CONTACT + "?text=" + encodeURIComponent(txt);
+  openTg(q);
 }
 
 function feedback() {
@@ -318,7 +326,7 @@ function feedback() {
 function foot(noFb) {
   return (S.zone && !noFb ? '<button class="btn alt" id="fb">Предложения и пожелания</button>' : "") + '<p class="note">Это практика самоуправления энергией, а не лечение. Если усталость держится, сопровождается нарушениями сна, потерей интереса почти ко всему или ощущением безнадёжности, обратись к врачу или психотерапевту.</p>' +
     '<div class="au"><img id="av" src="avatar.jpg" alt="" width="44" height="44"><span>Автор: Калугин Петр</span>' +
-    '<a class="tg" id="tgl" href="https://t.me/kaluginpn" target="_blank" rel="noopener" aria-label="Написать автору в Telegram">' +
+    '<a class="tg" id="tgl" href="https://telegram.me/kaluginpn" target="_blank" rel="noopener" aria-label="Написать автору в Telegram">' +
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg></a></div>';
 }
 
