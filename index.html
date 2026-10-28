@@ -55,6 +55,14 @@ p{margin-bottom:12px}.small{font-size:14px;color:var(--soft)}
 .tg{width:40px;height:40px;border-radius:50%;background:#fff;color:#229ED9;display:grid;place-items:center}
 .tg svg{width:22px;height:22px}
 .task input{width:100%;padding:11px;border:2px solid #cfdcec;border-radius:10px;font:inherit;color:var(--ink);margin-top:8px}
+.ev span{flex:1}
+.del{border:0;background:none;color:#8aa0bb;font-size:22px;line-height:1;padding:0 4px;cursor:pointer}
+a.btn{text-align:center;text-decoration:none}
+.rg input[type=range]{-webkit-appearance:none;appearance:none;height:12px;border-radius:7px;background:linear-gradient(90deg,#e5686a,#f5c446 50%,#46c896)}
+.rg input.pos{background:linear-gradient(90deg,#f5c446,#46c896)}
+.rg input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;border-radius:50%;background:#fff;border:4px solid var(--ink);box-shadow:0 2px 6px rgba(8,30,70,.3)}
+.rg input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:#fff;border:4px solid var(--ink)}
+.rg input[type=range]::-moz-range-track{background:transparent}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
@@ -64,7 +72,7 @@ p{margin-bottom:12px}.small{font-size:14px;color:var(--soft)}
 <script>
 // ---- настройки (заполнить перед публикацией) ----
 var CONTACT = "kaluginpn";   // без @
-var VC_URL = "";                          // ссылка на статью на VC (пока пусто = ссылка скрыта)
+var VC_URL = "https://vc.ru/id6160785/3216259-pochemu-vy-ne-chuvstvuete-sebya-otdohnuvshim";                          // ссылка на статью на VC (пока пусто = ссылка скрыта)
 var ANALYTICS_URL = "https://script.google.com/macros/s/AKfycbyDEP_dQVnfZJF5K_5XjsC03VgrHOHS0Q4wNKYoSJ4lKnRNmTgU0HE6BJ3u4ypVvnJ7PA/exec";                   // адрес приёма событий, пока пусто = аналитика выключена
 
 var tg = window.Telegram && Telegram.WebApp;
@@ -141,11 +149,26 @@ function addCharge(t, v) {
 function chargesHtml() {
   if (!S.ch.length) return '<p class="small">Здесь появятся твои зарядки: то, что помогло в аптечке или добавило энергии в дневнике.</p>';
   var li = "";
-  S.ch.slice(0, 10).forEach(function (c) { li += '<div class="ev"><span>' + esc(c.t) + '</span><b class="p">' + fmt(c.v) + "</b></div>"; });
+  S.ch.slice(0, 10).forEach(function (c, i) { li += '<div class="ev"><span>' + esc(c.t) + '</span><b class="p">' + fmt(c.v) + '</b><button class="del" data-k="ch" data-i="' + i + '" aria-label="Удалить">×</button></div>'; });
   return li;
 }
-function h(html) {
+function h(html, redraw) {
   app.innerHTML = html; window.scrollTo(0, 0);
+  Array.prototype.forEach.call(document.querySelectorAll("a[data-ext]"), function (a) {
+    a.onclick = function (e) { track("vc_click"); if (tg && tg.openLink) { e.preventDefault(); tg.openLink(a.href); } };
+  });
+  if (redraw) Array.prototype.forEach.call(document.querySelectorAll(".del"), function (el) {
+    el.onclick = function () {
+      var i = +el.getAttribute("data-i");
+      if (el.getAttribute("data-k") === "ev") {
+        var e = S.ev.splice(i, 1)[0];
+        if (e && e.v > 0 && !S.ev.some(function (x) { return x.v > 0 && x.t.toLowerCase() === e.t.toLowerCase(); }))
+          S.ch = S.ch.filter(function (c) { return c.t.toLowerCase() !== e.t.toLowerCase(); });
+        recalc(); battery();
+      } else { S.ch.splice(i, 1); }
+      save(); track("delete", el.getAttribute("data-k")); redraw();
+    };
+  });
   var av = document.getElementById("av");
   if (av) av.onerror = function () { var sp = document.createElement("span"); sp.className = "av"; sp.textContent = "КП"; av.replaceWith(sp); };
   var fb = document.getElementById("fb");
@@ -178,7 +201,7 @@ function intro() {
   h('<div class="card"><h2>Как это работает</h2>' +
     '<p>Представь себя как батарейку. Она и разряжается, и заряжается: что-то в течение дня отнимает у тебя силы, а что-то возвращает.</p>' +
     '<p>Это приложение поможет определить твой текущий уровень энергии и собрать личный набор зарядок, чтобы поддерживать себя в тонусе.</p>' +
-    (VC_URL ? '<p class="small"><a href="' + VC_URL + '" target="_blank" rel="noopener">Подробнее об инструменте читай в статье на VC</a></p>' : "") +
+    (VC_URL ? '<p class="small"><a data-ext="1" href="' + VC_URL + '" target="_blank" rel="noopener">Подробнее об инструменте читай в статье на VC</a></p>' : "") +
     '<button class="btn" id="go2">К тесту</button></div>' + foot());
   document.getElementById("go2").onclick = quiz;
 }
@@ -211,7 +234,8 @@ function result() {
     '<h2 style="margin-top:18px">Мои зарядки</h2>' + chargesHtml() +
     (red ? '<button class="btn" id="kit">Собрать аптечку</button>' : "") +
     '<button class="btn' + (red ? " alt" : "") + '" id="dy">Открыть дневник уровня энергии</button>' +
-    '<button class="btn alt" id="rt">Пройти тест заново</button></div>' + foot());
+    (VC_URL ? '<a class="btn alt" data-ext="1" id="vcl" href="' + VC_URL + '" target="_blank" rel="noopener">Читать статью на VC</a>' : "") +
+    '<button class="btn alt" id="rt">Пройти тест заново</button></div>' + foot(), result);
   var k = document.getElementById("kit"); if (k) k.onclick = function () { track("kit_open"); kit(); };
   document.getElementById("dy").onclick = function () { track("diary_open"); diary(); };
   document.getElementById("rt").onclick = function () {
@@ -227,8 +251,8 @@ function fmt(v) { return (v > 0 ? "+" : "−") + Math.abs(v); }
 function diary() {
   var ch = "", li = "", plus = 0, minus = 0;
   CH.forEach(function (c, n) { ch += '<button class="chip" data-n="' + n + '">' + c[0] + " " + fmt(c[1]) + "</button>"; });
-  S.ev.slice().reverse().forEach(function (e) {
-    li += '<div class="ev"><span>' + esc(e.t) + '</span><b class="' + (e.v > 0 ? "p" : "m") + '">' + fmt(e.v) + "</b></div>";
+  S.ev.slice().reverse().forEach(function (e, n) {
+    li += '<div class="ev"><span>' + esc(e.t) + '</span><b class="' + (e.v > 0 ? "p" : "m") + '">' + fmt(e.v) + '</b><button class="del" data-k="ev" data-i="' + (S.ev.length - 1 - n) + '" aria-label="Удалить">×</button></div>';
   });
   S.ev.forEach(function (e) { if (e.v > 0) plus += e.v; else minus -= e.v; });
   h('<div class="card"><h2>Дневник уровня энергии</h2><p class="small">Записывай всё, что добавляет или забирает силы, даже мелочи. Сила события от 1 до 10, баллы у каждого свои.</p>' +
@@ -238,9 +262,9 @@ function diary() {
     '<p class="small" id="sv" style="text-align:center">+3</p>' +
     '<button class="btn" id="ad">Добавить</button>' +
     '<p style="margin-top:18px"><b>Сегодня: ' + fmt(plus) + " / " + fmt(-minus) + "</b>, уровень " + S.charge + " из 20</p>" + li +
-    '<button class="btn alt" id="bk">Назад к результату</button></div>' + foot());
+    '<button class="btn alt" id="bk">Назад к результату</button></div>' + foot(), diary);
   var tx = document.getElementById("tx"), st = document.getElementById("st"), sv = document.getElementById("sv");
-  st.oninput = function () { sv.textContent = +st.value === 0 ? "0" : fmt(+st.value); };
+  st.oninput = function () { sv.textContent = +st.value === 0 ? "0" : fmt(+st.value); sv.style.color = +st.value < 0 ? "#c0393b" : "#0f8a5f"; };
   Array.prototype.forEach.call(document.querySelectorAll(".chip"), function (el) {
     el.onclick = function () { var c = CH[+el.getAttribute("data-n")]; tx.value = c[0]; st.value = c[1]; st.oninput(); };
   });
@@ -273,11 +297,11 @@ function kit() {
   document.getElementById("bk").onclick = result;
 }
 
-function kitDone() {
+function kitDone(skip) {
   var names = [S.track ? "Музыка: " + S.track : "Любимая музыка", "Десять минут на воздухе", "Упражнение «потянись»", "Короткий контакт с приятным человеком"];
   var win = [];
   KIT.forEach(function (t, n) { if (S.kit[n] === 0) win.push(n); });
-  win.forEach(function (n) { addCharge(names[n], 3); addKitEvent(names[n], 3); }); recalc(); save(); battery();
+  if (!skip) { win.forEach(function (n) { addCharge(names[n], 3); addKitEvent(names[n], 3); }); recalc(); save(); battery(); }
   if (!win.length) {
     h('<div class="card"><h2>Пока без перемен</h2><p>Ничего не стало легче, и это нормально, когда запас сильно снижен. Попробуй в другое время дня или повтори завтра. Если сил совсем нет, помогут напарник или наставник: загляни в «Предложения и пожелания» внизу.</p>' +
       '<button class="btn" id="kb">Вернуться к аптечке</button><button class="btn alt" id="mn">На главный экран</button></div>' + foot());
@@ -287,14 +311,14 @@ function kitDone() {
       '<h2 style="margin-top:14px">Мои зарядки</h2>' + chargesHtml() +
       '<p style="margin-top:16px"><b>Добавь своё событие, которое придало тебе энергии</b></p>' +
       '<input id="tx" maxlength="40" placeholder="Что тебя зарядило?" autocomplete="off">' +
-      '<div class="rg"><span>+1</span><input id="st" type="range" min="1" max="10" step="1" value="3"><span>+10</span></div>' +
+      '<div class="rg"><span>+1</span><input id="st" class="pos" type="range" min="1" max="10" step="1" value="3"><span>+10</span></div>' +
       '<p class="small" id="sv" style="text-align:center">+3</p>' +
-      '<button class="btn" id="ad">Добавить в мои зарядки</button><button class="btn alt" id="mn">На главный экран</button></div>' + foot());
+      '<button class="btn" id="ad">Добавить в мои зарядки</button><button class="btn alt" id="mn">На главный экран</button></div>' + foot(), function () { kitDone(true); });
     var tx = document.getElementById("tx"), st = document.getElementById("st"), sv = document.getElementById("sv");
     st.oninput = function () { sv.textContent = "+" + st.value; };
     document.getElementById("ad").onclick = function () {
       if (!tx.value.trim()) { sv.textContent = "Напиши, что тебя зарядило"; return; }
-      addCharge(tx.value.trim(), +st.value); S.ev.push({ t: tx.value.trim(), v: +st.value }); recalc(); save(); battery(); track("own_charge"); kitDone();
+      addCharge(tx.value.trim(), +st.value); S.ev.push({ t: tx.value.trim(), v: +st.value }); recalc(); save(); battery(); track("own_charge"); kitDone(true);
     };
   }
   document.getElementById("mn").onclick = result;
